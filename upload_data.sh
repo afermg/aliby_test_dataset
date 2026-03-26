@@ -1,7 +1,7 @@
 # Find the latest version of the dataset
 ZENODO_ENDPOINT="https://zenodo.org"
 DEPOSITION_PREFIX="${ZENODO_ENDPOINT}/api/deposit/depositions"
-ORIGINAL_ID="" # aliby test dataset
+ORIGINAL_ID="19228474" # aliby test dataset
 META_FILE="metadata.json"
 DIR_TO_VERSION="$1"
 
