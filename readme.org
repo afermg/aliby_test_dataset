@@ -3,7 +3,7 @@
 
 * Overview
 
-This repository is an LLM-aided effort to generate a small, reproducible dataset for integration testing the [[https://github.com/afermg/aliby][aliby]] software framework. 
+This repository is an [[file:.agent-shell/transcripts/][LLM-aided]] effort to generate a small, reproducible dataset for integration testing the [[https://github.com/afermg/aliby][aliby]] software framework. 
 
 The original full-size images were obtained from the JUMP_lite dataset. This project contains the logic to:
 1. Crop those full-size images into smaller 256x256 test patches.
