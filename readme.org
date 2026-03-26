@@ -1,0 +1,73 @@
+#+TITLE: Generating a small test dataset for aliby
+#+AUTHOR: Alán F. Muñoz
+
+* Overview
+
+This repository is an LLM-aided effort to generate a small, reproducible dataset for integration testing the [[https://github.com/afermg/aliby][aliby]] software framework. 
+
+The original full-size images were obtained from the JUMP_lite dataset. This project contains the logic to:
+1. Crop those full-size images into smaller 256x256 test patches.
+2. Group the resulting TIFF channels into a single `zarr` array using `zstd` compression via the provided Python script.
+3. Package the outputs into a single `.tar.gz` archive suitable for integration testing.
+4. Upload the dataset directly to Zenodo to act as an external test artifact for CI workflows.
+
+* Reduce the size of the images
+#+begin_src sh
+  cd data && mkdir -p tif_256 && for file in tif_1080/*.tif; do filename=$(basename "$file"); magick "$file" -gravity center -crop 256x256+0+0 +repage "tif_256/$filename"; done && cd ..
+  for i in data/tif_*/*; do ls $i; done
+#+end_src
+
+#+RESULTS:
+| data/tif_1080/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__AGP.tif  |
+| data/tif_1080/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__DNA.tif  |
+| data/tif_1080/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__ER.tif   |
+| data/tif_1080/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__Mito.tif |
+| data/tif_1080/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__RNA.tif  |
+| data/tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__AGP.tif   |
+| data/tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__DNA.tif   |
+| data/tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__ER.tif    |
+| data/tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__Mito.tif  |
+| data/tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__RNA.tif   |
+
+* Convert folder of tiffs into a zarr dataset
+#+begin_src sh :results raw :wrap example
+  uv run tiff_to_zarr.py data/tif_256 data/256.zarr -n 5
+#+end_src
+
+#+RESULTS:
+#+begin_example
+Found 5 files in data/tif_256.
+Grouping into 1 arrays (N=5).
+Saved array 'source_3__CP_25_all_Phenix1__JCPQC016__A01__1__' of shape (5, 256, 256) inside data/256.zarr
+#+end_example
+
+I manually validated that the files can be read AND that the images correspond to the alphabetically-sorted channels.
+
+* Compress the smaller files
+#+begin_src sh
+  mkdir -p files_to_upload
+  tar -czvf files_to_upload/aliby_test_dataset.tar.gz data/*256*
+#+end_src
+
+#+RESULTS:
+| data/256.zarr/                                                          |
+| data/256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/          |
+| data/256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/c/        |
+| data/256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/c/0/      |
+| data/256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/c/0/0/    |
+| data/256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/c/0/0/0   |
+| data/256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/zarr.json |
+| data/256.zarr/zarr.json                                                 |
+| data/tif_256/                                                           |
+| data/tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__Mito.tif    |
+| data/tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__RNA.tif     |
+| data/tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__DNA.tif     |
+| data/tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__AGP.tif     |
+| data/tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__ER.tif      |
+
+* Upload to Zenodo
+
+The generated archive in `files_to_upload/` has been published to Zenodo.
+#+begin_src sh
+  ZENODO_TOKEN=$(cat ~/.zenodo_token) bash upload_data.sh files_to_upload/
+#+end_src

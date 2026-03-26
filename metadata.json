@@ -1,0 +1,11 @@
+{"metadata": {
+    "title": "Aliby Test Dataset",
+    "creators": [
+        {
+            "name": "Alán F. Muñoz"
+        }
+    ],
+    "description": "<p>Test dataset specifically built for the <a href=\"https://github.com/afermg/aliby\">aliby</a> software repository, packaged as <code>aliby_test_dataset.tar.gz</code>.</p>",
+"upload_type": "dataset",
+"access_right": "open"
+}}
