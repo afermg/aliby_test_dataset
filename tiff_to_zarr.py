@@ -5,6 +5,7 @@
 #     "numpy",
 #     "tifffile",
 #     "zarr",
+#     "imagecodecs",
 # ]
 # ///
 import os

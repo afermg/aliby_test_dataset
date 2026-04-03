@@ -6,64 +6,120 @@
 This repository is an [[file:.agent-shell/transcripts/][LLM-aided]] effort to generate a small, reproducible dataset for integration testing the [[https://github.com/afermg/aliby][aliby]] framework for high throughput cell microscopy. 
 
 The original full-size images were obtained from the JUMP_lite dataset. This project contains the logic to:
-1. Crop those full-size images into smaller 256x256 test patches.
+1. Crop those full-size images into smaller 256x256 (cell painting) or 293x293 (time series) crops.
 2. Group the resulting TIFF channels into a single `zarr` array using `zstd` compression via the provided Python script.
 3. Package the outputs into a single `.tar.gz` archive suitable for integration testing.
 4. Upload the dataset directly to [[https://zenodo.org/records/19228474][Zenodo]] to act as an external test artifact for CI workflows.
 
-* Reduce the size of the images
+* Download original data
+
+The full dataset is hosted on Zenodo. We first download and extract it to ensure the pipeline is reproducible from scratch.
 #+begin_src sh
-  cd data && mkdir -p tif_256 && for file in tif_1080/*.tif; do filename=$(basename "$file"); magick "$file" -gravity center -crop 256x256+0+0 +repage "tif_256/$filename"; done && cd ..
-  for i in data/tif_*/*; do ls $i; done
+  mkdir -p data
+  curl -L -o data/aliby_full_dataset.tar.gz "https://zenodo.org/api/records/19410594/files/aliby_full_dataset.tar.gz/content"
+  cd data
+  tar -xzvf aliby_full_dataset.tar.gz
+  rm aliby_full_dataset.tar.gz
+  cd ..
+#+end_src
+
+*  Crop images
+** Reduce the size of the images
+#+begin_src sh
+  cd data
+  # Cell painting
+  mkdir -p crop_cellpainting_tif_256
+  for file in full_cellpainting_tif_1080/*.tif; do
+      filename=$(basename "$file")
+      magick "$file" -gravity center -crop 256x256+0+0 +repage -compress Zstd "crop_cellpainting_tif_256/$filename"
+  done
+  
+  # Time series
+  for ds in full_timeseries_*_1172; do
+      if [ -d "$ds" ]; then
+          out_dir="crop_${ds#full_}"
+          out_dir="${out_dir/_1172/_293}"
+          mkdir -p "$out_dir"
+          for dir in "$ds"/*; do
+              if [ -d "$dir" ]; then
+                  dirname=$(basename "$dir")
+                  mkdir -p "$out_dir/$dirname"
+                  for file in "$dir"/*.tif; do
+                      filename=$(basename "$file")
+                      magick "$file" -gravity center -crop 293x293+0+0 +repage -compress Zstd "$out_dir/$dirname/$filename"
+                  done
+              fi
+          done
+      fi
+  done
+  cd ..
 #+end_src
 
 #+RESULTS:
-| data/tif_1080/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__AGP.tif  |
-| data/tif_1080/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__DNA.tif  |
-| data/tif_1080/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__ER.tif   |
-| data/tif_1080/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__Mito.tif |
-| data/tif_1080/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__RNA.tif  |
-| data/tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__AGP.tif   |
-| data/tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__DNA.tif   |
-| data/tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__ER.tif    |
-| data/tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__Mito.tif  |
-| data/tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__RNA.tif   |
 
-* Convert folder of tiffs into a zarr dataset
+** Convert folder of tiffs into a zarr dataset
 #+begin_src sh :results raw :wrap example
-  uv run tiff_to_zarr.py data/tif_256 data/256.zarr -n 5
+  # Cell painting
+  uv run tiff_to_zarr.py data/crop_cellpainting_tif_256 data/crop_cellpainting_zarr_256.zarr -n 5
+  
+  # Time series
+  for ds in data/crop_timeseries_*_293; do
+      if [ -d "$ds" ]; then
+          dsname=$(basename "$ds" | sed 's/^crop_//; s/_293$//; s/_tif//')
+          out_zarr_dir="data/crop_${dsname}_zarr_293"
+          mkdir -p "$out_zarr_dir"
+          for dir in "$ds"/*; do
+              if [ -d "$dir" ]; then
+                  dirname=$(basename "$dir")
+                  uv run timeseries_to_zarr.py "$dir" "$out_zarr_dir/${dirname}.zarr"
+              fi
+          done
+      fi
+  done
 #+end_src
 
 #+RESULTS:
 #+begin_example
-Found 5 files in data/tif_256.
+Found 5 files in data/crop_cellpainting_tif_256.
 Grouping into 1 arrays (N=5).
-Saved array 'source_3__CP_25_all_Phenix1__JCPQC016__A01__1__' of shape (5, 256, 256) inside data/256.zarr
+Saved array 'source_3__CP_25_all_Phenix1__JCPQC016__A01__1__' of shape (5, 256, 256) inside data/crop_cellpainting_zarr_256.zarr
+Creating Zarr array with shape (T=3, C=2, Z=5, Y=293, X=293)
+Saved timeseries dataset to data/crop_timeseries_alcatras_round_diff_dims_zarr_293/fy4_001.zarr
+Creating Zarr array with shape (T=2, C=3, Z=5, Y=293, X=293)
+Saved timeseries dataset to data/crop_timeseries_alcatras_round_diff_dims_zarr_293/htb2mCherry_014.zarr
+Creating Zarr array with shape (T=4, C=3, Z=3, Y=293, X=293)
+Saved timeseries dataset to data/crop_timeseries_alcatras_square_same_channels_zarr_293/PDR5_GFP_001.zarr
+Creating Zarr array with shape (T=4, C=3, Z=3, Y=293, X=293)
+Saved timeseries dataset to data/crop_timeseries_alcatras_square_same_channels_zarr_293/PDR5_GFP_002.zarr
 #+end_example
 
 I manually validated that the files can be read AND that the images correspond to the alphabetically-sorted channels.
 
-* Compress the smaller files
+
+* Compress the datasets
 #+begin_src sh
   mkdir -p files_to_upload
-  tar -czvf files_to_upload/aliby_test_dataset.tar.gz data/*256*
+  cd data
+  tar -czvf ../files_to_upload/aliby_test_dataset.tar.gz crop*
+  tar -czvf ../files_to_upload/aliby_full_dataset.tar.gz full_*
+  cd ..
 #+end_src
 
 #+RESULTS:
-| data/256.zarr/                                                          |
-| data/256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/          |
-| data/256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/c/        |
-| data/256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/c/0/      |
-| data/256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/c/0/0/    |
-| data/256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/c/0/0/0   |
-| data/256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/zarr.json |
-| data/256.zarr/zarr.json                                                 |
-| data/tif_256/                                                           |
-| data/tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__Mito.tif    |
-| data/tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__RNA.tif     |
-| data/tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__DNA.tif     |
-| data/tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__AGP.tif     |
-| data/tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__ER.tif      |
+| crop_cellpainting_tif_256/ |
+| crop_cellpainting_tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__ER.tif |
+| crop_cellpainting_tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__Mito.tif |
+| crop_cellpainting_tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__DNA.tif |
+| crop_cellpainting_tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__AGP.tif |
+| crop_cellpainting_tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__RNA.tif |
+| crop_cellpainting_zarr_256.zarr/ |
+| crop_cellpainting_zarr_256.zarr/zarr.json |
+| crop_cellpainting_zarr_256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/ |
+| crop_cellpainting_zarr_256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/c/ |
+| crop_cellpainting_zarr_256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/c/0/ |
+| crop_cellpainting_zarr_256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/c/0/0/ |
+| crop_cellpainting_zarr_256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/c/0/0/0 |
+| crop_cellpainting_zarr_256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/zarr.json |
 
 * Upload to Zenodo
 
