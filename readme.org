@@ -28,10 +28,10 @@ The full dataset is hosted on Zenodo. We first download and extract it to ensure
 #+begin_src sh
   cd data
   # Cell painting
-  mkdir -p crop_cellpainting_tif_256
-  for file in full_cellpainting_tif_1080/*.tif; do
+  mkdir -p crop_cellpainting_256
+  for file in full_cellpainting_1080/*.tif; do
       filename=$(basename "$file")
-      magick "$file" -gravity center -crop 256x256+0+0 +repage -compress Zstd "crop_cellpainting_tif_256/$filename"
+      magick "$file" -gravity center -crop 256x256+0+0 +repage -compress Zstd "crop_cellpainting_256/$filename"
   done
   
   # Time series
@@ -60,13 +60,13 @@ The full dataset is hosted on Zenodo. We first download and extract it to ensure
 ** Convert folder of tiffs into a zarr dataset
 #+begin_src sh :results raw :wrap example
   # Cell painting
-  uv run tiff_to_zarr.py data/crop_cellpainting_tif_256 data/crop_cellpainting_zarr_256.zarr -n 5
+  uv run tiff_to_zarr.py data/crop_cellpainting_256 data/crop_cellpainting_256.zarr -n 5
   
   # Time series
   for ds in data/crop_timeseries_*_293; do
       if [ -d "$ds" ]; then
-          dsname=$(basename "$ds" | sed 's/^crop_//; s/_293$//; s/_tif//')
-          out_zarr_dir="data/crop_${dsname}_zarr_293"
+          dsname=$(basename "$ds" | sed 's/^crop_//; s/_293$//')
+          out_zarr_dir="data/crop_${dsname}_293_zarrs"
           mkdir -p "$out_zarr_dir"
           for dir in "$ds"/*; do
               if [ -d "$dir" ]; then
@@ -80,18 +80,19 @@ The full dataset is hosted on Zenodo. We first download and extract it to ensure
 
 #+RESULTS:
 #+begin_example
-Found 5 files in data/crop_cellpainting_tif_256.
+Found 5 files in data/crop_cellpainting_256.
 Grouping into 1 arrays (N=5).
-Saved array 'source_3__CP_25_all_Phenix1__JCPQC016__A01__1__' of shape (5, 256, 256) inside data/crop_cellpainting_zarr_256.zarr
-Creating Zarr array with shape (T=3, C=2, Z=5, Y=293, X=293)
-Saved timeseries dataset to data/crop_timeseries_alcatras_round_diff_dims_zarr_293/fy4_001.zarr
-Creating Zarr array with shape (T=2, C=3, Z=5, Y=293, X=293)
-Saved timeseries dataset to data/crop_timeseries_alcatras_round_diff_dims_zarr_293/htb2mCherry_014.zarr
+Saved array 'source_3__CP_25_all_Phenix1__JCPQC016__A01__1__' of shape (5, 256, 256) inside data/crop_cellpainting_256.zarr
+Creating Zarr array with shape (T=3, C=2, Z=3, Y=293, X=293)
+Saved timeseries dataset to data/crop_timeseries_alcatras_round_diff_dims_293_zarrs/fy4_001.zarr
+Creating Zarr array with shape (T=2, C=3, Z=3, Y=293, X=293)
+Saved timeseries dataset to data/crop_timeseries_alcatras_round_diff_dims_293_zarrs/htb2mCherry_014.zarr
 Creating Zarr array with shape (T=4, C=3, Z=3, Y=293, X=293)
-Saved timeseries dataset to data/crop_timeseries_alcatras_square_same_channels_zarr_293/PDR5_GFP_001.zarr
+Saved timeseries dataset to data/crop_timeseries_alcatras_square_same_channels_293_zarrs/PDR5_GFP_001.zarr
 Creating Zarr array with shape (T=4, C=3, Z=3, Y=293, X=293)
-Saved timeseries dataset to data/crop_timeseries_alcatras_square_same_channels_zarr_293/PDR5_GFP_002.zarr
+Saved timeseries dataset to data/crop_timeseries_alcatras_square_same_channels_293_zarrs/PDR5_GFP_002.zarr
 #+end_example
+
 
 I manually validated that the files can be read AND that the images correspond to the alphabetically-sorted channels.
 
@@ -106,20 +107,20 @@ I manually validated that the files can be read AND that the images correspond t
 #+end_src
 
 #+RESULTS:
-| crop_cellpainting_tif_256/ |
-| crop_cellpainting_tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__ER.tif |
-| crop_cellpainting_tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__Mito.tif |
-| crop_cellpainting_tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__DNA.tif |
-| crop_cellpainting_tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__AGP.tif |
-| crop_cellpainting_tif_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__RNA.tif |
-| crop_cellpainting_zarr_256.zarr/ |
-| crop_cellpainting_zarr_256.zarr/zarr.json |
-| crop_cellpainting_zarr_256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/ |
-| crop_cellpainting_zarr_256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/c/ |
-| crop_cellpainting_zarr_256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/c/0/ |
-| crop_cellpainting_zarr_256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/c/0/0/ |
-| crop_cellpainting_zarr_256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/c/0/0/0 |
-| crop_cellpainting_zarr_256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/zarr.json |
+| crop_cellpainting_256/ |
+| crop_cellpainting_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__DNA.tif |
+| crop_cellpainting_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__AGP.tif |
+| crop_cellpainting_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__Mito.tif |
+| crop_cellpainting_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__RNA.tif |
+| crop_cellpainting_256/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__ER.tif |
+| crop_cellpainting_256.zarr/ |
+| crop_cellpainting_256.zarr/zarr.json |
+| crop_cellpainting_256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/ |
+| crop_cellpainting_256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/c/ |
+| crop_cellpainting_256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/c/0/ |
+| crop_cellpainting_256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/c/0/0/ |
+| crop_cellpainting_256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/c/0/0/0 |
+| crop_cellpainting_256.zarr/source_3__CP_25_all_Phenix1__JCPQC016__A01__1__/zarr.json |
 
 * Upload to Zenodo
 
